@@ -1,8 +1,4 @@
-
-
-
-
-markdown
+Markdown
 # Thuật Toán Điều Khiển PID (PID Control)
 
 Tài liệu mô tả kiến trúc thuật toán điều khiển PID đơn vòng và PID lồng kép (Cascade PID) ứng dụng để giữ thăng bằng và ổn định vị trí cho xe 2 bánh tự cân bằng.
