@@ -19,11 +19,11 @@
 
 Bộ lọc bù đưa tín hiệu Accel qua **Bộ lọc thông thấp (Low-Pass Filter)** và tín hiệu tích phân Gyro qua **Bộ lọc thông cao (High-Pass Filter)**, sau đó cộng gộp lại:
 
-$$\theta_{filtered}(k) = \alpha \cdot \left[ \theta_{filtered}(k-1) + \omega_{gyro} \cdot dt \right] + (1 - \alpha) \cdot \theta_{acc}$$
+$$\theta_{\text{filtered}}(k) = \alpha \cdot \left[ \theta_{\text{filtered}}(k-1) + \omega_{\text{gyro}} \cdot dt \right] + (1 - \alpha) \cdot \theta_{\text{acc}}$$
 
 Trong đó:
-* $\theta_{acc}$: Góc tính từ gia tốc kế, $\theta_{acc} = \arctan2(A_y, A_z) \cdot \frac{180}{\pi}$.
-* $\omega_{gyro}$: Tốc độ góc đọc từ Gyro (đơn vị: `deg/s`).
+* $\theta_{\text{acc}}$: Góc tính từ gia tốc kế, $\theta_{\text{acc}} = \text{atan2}(A_y, A_z) \cdot \frac{180}{\pi}$.
+* $\omega_{\text{gyro}}$: Tốc độ góc đọc từ Gyro (đơn vị: `deg/s`).
 * $dt$: Khoảng thời gian giữa 2 lần lấy mẫu (`seconds`).
 * $\alpha$: Hệ số trọng số ($0 < \alpha < 1$). Thường chọn $\alpha \approx 0.95 \div 0.98$.
 
