@@ -65,5 +65,3 @@ int16_t Apply_Deadzone(int16_t pwm_calculated, int16_t deadzone_threshold, int16
 }
 ```
 ````[cite: 11]
-
-*(Nếu bạn đã dùng nút copy toàn bộ ở ô **File 2: Motor_Control.md** mà tôi gửi trọn vẹn ở phản hồi trước thì mục này đã có sẵn ở cuối rồi, không cần dán thêm lần nữa).*
