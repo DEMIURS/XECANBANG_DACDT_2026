@@ -108,5 +108,3 @@ graph TD
     E -- Có --> F[Hoàn tất cân chỉnh]
 ```
 ````[cite: 10]
-
-*(Lưu ý: Ở file `PID_Control.md` hoàn chỉnh tôi đã gửi sẵn trong ô mã ở phản hồi trước, đoạn này đã được bọc sẵn cú pháp ```mermaid rồi, nếu bạn copy toàn bộ từ ô đó thì không cần phải dán lẻ nữa).*
