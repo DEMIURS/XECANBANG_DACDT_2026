@@ -1,8 +1,3 @@
----
-
-### File 2: `Motor_Control.md` (hoạt động cho cả `03_motor_control.md`)
-
-```markdown
 # ⚡ Điều Khiển Động Cơ DC (Motor Control)
 
 Xử lý tín hiệu điều khiển đầu ra (PWM) và tín hiệu hồi tiếp vận tốc/vị trí (Quadrature Encoder).
