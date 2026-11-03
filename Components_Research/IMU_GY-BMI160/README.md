@@ -1,16 +1,22 @@
-GY-BMI160 là cảm biến quán tính 6 bậc tự do, tích hợp cảm biến gia tốc ba trục và cảm biến con quay hồi chuyển ba trục. 
-Trong hệ thống xe hai bánh tự cân bằng, module có nhiệm vụ thu thập dữ liệu về gia tốc và tốc độ góc của thân xe.
-Dữ liệu này được truyền đến STM32F103C8T6 thông qua giao tiếp I²C để thực hiện hiệu chỉnh, lọc và ước lượng góc nghiêng của xe.
-Góc nghiêng và tốc độ góc là các thông tin phản hồi quan trọng để thuật toán điều khiển xác định mức tác động cần thiết lên hai động cơ nhằm duy trì trạng thái cân bằng.
-Nếu STM32 là bộ não, TB6612FNG là tầng công suất, thì GY-BMI160 chính là cảm biến giúp STM32 "biết xe đang nghiêng và đang chuyển động như thế nào".
-3-axis accelerometer — cảm biến gia tốc 3 trục.
-3-axis gyroscope — cảm biến tốc độ góc 3 trục.
+# IMU GY-BMI160
 
-Do đó có tổng cộng: 3+3=6 DOF
+GY-BMI160 là module xoay quanh cảm biến BMI160, gồm gia tốc kế ba trục và gyro ba trục (IMU 6 trục). Trên xe cân bằng, gia tốc kế cung cấp tham chiếu trọng lực để ước lượng góc nghiêng; gyro đo tốc độ quay để điều khiển phản ứng nhanh.
 
-hay còn gọi là 6-axis IMU.
-Trong xe cân bằng, hai nhóm dữ liệu này có vai trò khác nhau:
-  Cảm biến accelerometer: Xác định hướng trọng lực → ước lượng góc nghiêng
-  Cảm biến gyroscope: Đo tốc độ quay → biết xe đang nghiêng nhanh/chậm
+## Giao tiếp và dữ liệu
 
-BMI160 thường có địa chỉ I²C: 0x68 hoặc 0x69 tùy trạng thái của chân địa chỉ trên module.
+* BMI160 hỗ trợ giao tiếp I²C và SPI. Dự án có thể dùng I²C nếu module và cấu hình chân trên bo cho phép.
+* Địa chỉ I²C 7-bit thường là `0x68` hoặc `0x69`, tùy chân SDO/SA0. Một số API nhận địa chỉ đã dịch trái một bit; kiểm tra quy ước thư viện trước khi cấu hình.
+* Dữ liệu thô cần được đổi theo dải đo gia tốc và gyro đang cấu hình. Trừ bias gyro trước khi tích phân hoặc đưa vào bộ điều khiển.
+* BMI160 không có từ kế tích hợp nên không cung cấp tham chiếu yaw tuyệt đối.
+
+## Lưu ý lắp đặt
+
+Gắn cảm biến chắc chắn lên khung xe, ghi lại hướng các trục X/Y/Z và kiểm tra dấu bằng cách nghiêng xe thủ công. Tránh lắp gần nguồn rung mạnh hoặc dây động cơ công suất nếu có thể. Cảm biến phải dùng đúng điện áp và mức logic của module thực tế; không suy ra khả năng chịu 5 V chỉ từ tên module.
+
+## Tài liệu và hình ảnh
+
+* [Datasheet BMI160 của Bosch](BMI160.PDF)
+* [Tài liệu module GY-BMI160](GY_BMI160_IMU_Sensor.pdf)
+* ![Module GY-BMI160](GY-BMI160_image.png)
+
+Xem [lý thuyết IMU](../../Control_Theory/IMU_Theory.md) và [bộ lọc bù](../../Control_Theory/Complementary_Filter.md).

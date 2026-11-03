@@ -1,78 +1,71 @@
-# 🧭 Lý Thuyết Cảm Biến Quán Tính (IMU Theory)
+# 🧭 Lý thuyết cảm biến quán tính (IMU)
 
-Tài liệu chi tiết về nguyên lý hoạt động, mô hình toán học và các đặc tính vật lý của cảm biến đo lường quán tính (Inertial Measurement Unit - IMU), trọng tâm là cảm biến 6 bậc tự do (6-DOF: Accelerometer + Gyroscope như MPU6050/ICM-20600).
-
----
-
-## 1. Cảm Biến Gia Tốc (Accelerometer)
-
-### 1.1. Nguyên lý đo
-* Cảm biến gia tốc MEMS đo lực quán tính tác dụng lên một khối lượng chuẩn (proof mass) bị giữ bởi các vi lò xo điện dung.
-* Đại lượng đo được là **Gia tốc riêng (Specific Force)**, bao gồm tổng của gia tốc chuyển động tuyến tính và phản lực trọng trường:
-  $$\vec{a}_{meas} = \vec{a}_{motion} - \vec{g}$$
-* Ở trạng thái đứng yên hoặc chuyển động đều ($\vec{a}_{motion} = 0$), cảm biến chỉ đo duy nhất thành phần trọng trường Trái Đất:
-  $$\vec{a}_{meas} = -\vec{g}$$
-
-### 1.2. Công thức tính góc nghiêng (Tilt Angles)
-Từ các thành phần gia tốc trục $A_x, A_y, A_z$, ta tính được các góc nghiêng (Pitch $\theta$ và Roll $\phi$) theo hệ tọa độ Euler:
-
-* **Góc Roll ($\phi$ - quay quanh trục X):**
-  $$\phi = \arctan2\left(A_y, A_z\right) \cdot \frac{180}{\pi}$$
-
-* **Góc Pitch ($\theta$ - quay quanh trục Y):**
-  $$\theta = \arctan2\left(-A_x, \sqrt{A_y^2 + A_z^2}\right) \cdot \frac{180}{\pi}$$
-
-> ⚠️ **Lưu ý:** Accelerometer **không thể đo được góc Yaw (quay quanh trục Z)** vì trục quay trùng với phương của véc-tơ trọng trường.
-
-### 1.3. Ưu & Nhược điểm
-* **Ưu điểm:** Đo góc tĩnh tuyệt đối chính xác; sai số không bị tích lũy theo thời gian (Zero Drift).
-* **Nhược điểm:** Cực kỳ nhạy cảm với rung động cơ khí tần số cao và gia tốc chuyển động tức thời của xe/robot.
+GY-BMI160 trên xe gồm gia tốc kế và con quay hồi chuyển ba trục, tạo thành IMU 6 trục (6-DoF). IMU đo chuyển động của cảm biến; phần mềm phải hiệu chuẩn, đổi đơn vị và ghép các trục theo hướng lắp cảm biến trước khi dùng dữ liệu trong vòng điều khiển.
 
 ---
 
-## 2. Con Quay Hồi Chuyển (Gyroscope)
+## 1. Gia tốc kế
 
-### 2.1. Nguyên lý đo
-* Hoạt động dựa trên hiệu ứng **Coriolis**: Khi một phần tử vi cơ chuyển động dao động và có chuyển động quay của khung, một lực Coriolis vuông góc sẽ sinh ra, làm biến dạng tụ điện đo.
-* Đại lượng đo trực tiếp là **Tốc độ góc (Angular Velocity)** $\omega$ trên từng trục: $\omega_x, \omega_y, \omega_z$ (đơn vị: $\text{deg/s}$ hoặc $\text{rad/s}$).
+Gia tốc kế MEMS đo **gia tốc riêng**. Theo quy ước véc-tơ trọng trường $\vec g$ hướng xuống, tín hiệu đo có thể viết $\vec f = \vec a - \vec g$, trong đó $\vec a$ là gia tốc chuyển động của cảm biến. Khi đứng yên, độ lớn véc-tơ đo xấp xỉ $g$; dấu từng trục phụ thuộc hướng đặt cảm biến và quy ước tọa độ.
 
-### 2.2. Tính toán góc nghiêng qua Tích phân
-Góc nghiêng được tính bằng cách tích phân số tốc độ góc theo thời gian:
+Khi xe đứng yên hoặc chuyển động chậm, có thể ước lượng góc nghiêng từ trọng lực:
 
-$$\theta(k) = \theta(k-1) + \omega(k) \cdot \Delta t$$
+* Roll: $\phi = \operatorname{atan2}(A_y,A_z)\cdot 180/\pi$.
+* Pitch: $\theta = \operatorname{atan2}(-A_x,\sqrt{A_y^2+A_z^2})\cdot 180/\pi$.
 
-### 2.3. Ưu & Nhược điểm
-* **Ưu điểm:** Tốc độ đáp ứng cực cao, mượt mà, không bị ảnh hưởng bởi rung chấn cơ học ngắn hạn.
-* **Nhược điểm:** 
-  - **Gyro Bias / Offset:** Khi đứng yên, Gyro vẫn xuất hiện giá trị đo khác 0 ($\omega_{offset} \neq 0$).
-  - **Drift (Trôi góc):** Việc tích phân một giá trị offset cố định qua thời gian làm sai số góc tăng tuyến tính theo thời gian:
-    $$e_{\theta}(t) = \int_{0}^{t} \omega_{offset} \, d\tau = \omega_{offset} \cdot t$$
+Các công thức trên giả định trục cảm biến trùng với hệ tọa độ nêu trong tài liệu. Nếu BMI160 được xoay khi lắp lên xe, cần hoán đổi trục hoặc đổi dấu theo sơ đồ lắp thực tế. Gia tốc kế không xác định được góc yaw tuyệt đối vì trọng trường không cung cấp hướng tham chiếu quanh trục thẳng đứng.
 
----
+**Ưu điểm:** cung cấp tham chiếu góc dài hạn khi chỉ có trọng lực tác dụng. **Hạn chế:** rung và gia tốc tịnh tiến làm véc-tơ đo lệch khỏi trọng lực, khiến góc tức thời nhiễu.
 
-## 3. Hiệu Chuẩn Tĩnh (Zero-rate Calibration)
+## 2. Con quay hồi chuyển
 
-Trước khi đưa vào thuật toán điều khiển, bắt buộc phải loại bỏ Gyro Offset bằng quy trình lấy mẫu tĩnh khi vừa cấp nguồn:
+Con quay hồi chuyển MEMS đo tốc độ góc quanh ba trục, thường được biểu diễn bằng `deg/s` hoặc `rad/s`. Để đổi tốc độ góc thành góc quanh một trục, có thể tích phân số:
+
+$$\theta_k = \theta_{k-1} + \omega_k\Delta t$$
+
+Đây là xấp xỉ phù hợp cho chuyển động một trục hoặc góc nhỏ quanh tư thế thẳng đứng. Với chuyển động ba chiều lớn, tốc độ Euler không bằng trực tiếp tốc độ quay thân trên từng trục; cần phép biến đổi tư thế đầy đủ.
+
+**Ưu điểm:** phản ứng nhanh với thay đổi góc ngắn hạn. **Hạn chế:** bias và nhiễu của gyro tích lũy thành drift khi tích phân. Trừ bias nhưng không loại bỏ hết nhiễu ngẫu nhiên.
+
+## 3. Hiệu chuẩn gyro đứng yên
+
+Khi khởi động, giữ xe đứng yên và lấy trung bình nhiều mẫu để ước lượng bias. Mẫu trong ví dụ là số đếm thô; nếu driver đã đổi sang `deg/s`, bias và dữ liệu dùng sau đó phải cùng đơn vị.
 
 ```c
 #define CALIBRATION_SAMPLES 500
 
-float gyro_x_offset = 0.0f;
-float gyro_y_offset = 0.0f;
-float gyro_z_offset = 0.0f;
+float gyro_x_bias = 0.0f;
+float gyro_y_bias = 0.0f;
+float gyro_z_bias = 0.0f;
 
 void IMU_Calibrate(void) {
-    float sum_x = 0, sum_y = 0, sum_z = 0;
-    
-    // Đảm bảo robot được giữ cố định hoàn toàn trong giai đoạn này
-    for (int i = 0; i < CALIBRATION_SAMPLES; i++) {
+    float sum_x = 0.0f;
+    float sum_y = 0.0f;
+    float sum_z = 0.0f;
+
+    // Giữ xe bất động; đọc lần lượt đủ 500 mẫu mới.
+    for (int i = 0; i < CALIBRATION_SAMPLES; ++i) {
         sum_x += Read_Raw_Gyro_X();
         sum_y += Read_Raw_Gyro_Y();
         sum_z += Read_Raw_Gyro_Z();
         Delay_ms(2);
     }
-    
-    gyro_x_offset = sum_x / CALIBRATION_SAMPLES;
-    gyro_y_offset = sum_y / CALIBRATION_SAMPLES;
-    gyro_z_offset = sum_z / CALIBRATION_SAMPLES;
+
+    gyro_x_bias = sum_x / (float)CALIBRATION_SAMPLES;
+    gyro_y_bias = sum_y / (float)CALIBRATION_SAMPLES;
+    gyro_z_bias = sum_z / (float)CALIBRATION_SAMPLES;
 }
+```
+
+Sau hiệu chuẩn, tính `gyro_corrected = gyro_raw - gyro_bias`, rồi đổi sang đơn vị góc theo dải đo gyro đã cấu hình trong BMI160. Chỉ hiệu chuẩn khi cảm biến đã khởi động ổn định và xe không bị chạm hoặc rung; nếu xe di chuyển trong lúc lấy mẫu, bias ước lượng sẽ sai. Hiệu chuẩn bias gyro không hiệu chuẩn hệ số tỷ lệ, lệch trục hay offset gia tốc kế.
+
+BMI160 hỗ trợ giao tiếp I²C và SPI. Địa chỉ I²C 7-bit thường là `0x68` hoặc `0x69`, tùy mức chân SDO/SA0; một số thư viện yêu cầu truyền địa chỉ đã dịch trái, vì vậy cần kiểm tra quy ước của API đang dùng.
+
+## 4. Ghép dữ liệu
+
+Bộ lọc bù dùng gyro cho đáp ứng nhanh và gia tốc kế để hiệu chỉnh drift dài hạn. Cách tính và mã C một trục được trình bày trong [Bộ lọc bù](Complementary_Filter.md).
+
+## 5. Tài liệu tham khảo
+
+* [Bosch Sensortec BMI160 Datasheet](https://www.bosch-sensortec.com/media/boschsensortec/downloads/datasheets/bst-bmi160-ds000.pdf)
+* [Tài liệu tham khảo và datasheet của dự án](../References/Links.md)

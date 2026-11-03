@@ -1,2 +1,20 @@
-MP1584EN là bộ chuyển đổi nguồn DC-DC giảm áp kiểu buck (buck converter), được sử dụng để chuyển đổi điện áp từ bộ pin Li-ion 3S có điện áp danh định 11,1 V xuống mức điện áp phù hợp cho khối điều khiển và các thiết bị điện tử của hệ thống. IC MP1584 có dải điện áp đầu vào 4,5–28 V và khả năng cung cấp dòng đầu ra tối đa theo thông số thiết kế lên đến 3 A. Việc sử dụng bộ chuyển đổi buck giúp tạo nguồn ổn định và hiệu suất cao hơn so với phương pháp giảm áp tuyến tính, đồng thời tách nhánh nguồn điện tử khỏi nhánh công suất động cơ. Nhiệm vụ chính của nó là hạ điện áp từ bộ pin 3S 18650 xuống mức điện áp phù hợp để cấp cho khối điều khiển, đặc biệt là STM32 Blue Pill.
-Theo datasheet của MPS, IC MP1584 là bộ chuyển đổi giảm áp có dải điện áp đầu vào 4,5–28 V, dòng đầu ra được công bố 3 A, và tần số chuyển mạch có thể lập trình từ 100 kHz đến 1,5 MHz.
+# Bộ chuyển đổi hạ áp MP1584EN
+
+MP1584EN là bộ chuyển đổi DC-DC kiểu buck, dùng để tạo đường nguồn thấp hơn từ bộ pin 3S cho các khối điện tử. Điện áp đầu ra của module phải được chỉnh và đo xác nhận theo tải trước khi nối với STM32 hoặc cảm biến.
+
+## Thông tin chính
+
+* Dải điện áp đầu vào của IC: 4,5–28 V.
+* Tần số chuyển mạch có thể cấu hình trong khoảng 100 kHz–1,5 MHz.
+* Datasheet nêu dòng đầu ra tới 3 A trong điều kiện thiết kế phù hợp. Khả năng của module thực tế còn phụ thuộc cuộn cảm, diode, PCB, tản nhiệt và nhiệt độ; không mặc định module luôn cấp được 3 A.
+* Pin Li-ion 3S có điện áp danh định 11,1 V và đạt khoảng 12,6 V khi sạc đầy.
+
+## Vai trò trong xe
+
+Module hạ áp cấp nguồn cho các tải điện tử theo điện áp yêu cầu của sơ đồ nguồn. Chọn điện áp đầu ra từ datasheet của tải, kiểm tra cực tính và đo điện áp trước khi kết nối. Không cấp trực tiếp điện áp pin 3S vào chân nguồn logic của STM32 hoặc BMI160.
+
+## Tài liệu và hình ảnh
+
+* [Datasheet MP1584EN](MP1584.PDF)
+* [Tài liệu bộ nguồn buck](MP1584EN_Buck_Converter.pdf)
+* ![Module MP1584EN](mp1584en_img.jpg)
