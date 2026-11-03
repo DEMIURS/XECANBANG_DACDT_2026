@@ -76,3 +76,4 @@ void IMU_Calibrate(void) {
     gyro_y_offset = sum_y / CALIBRATION_SAMPLES;
     gyro_z_offset = sum_z / CALIBRATION_SAMPLES;
 }
+```

@@ -56,3 +56,4 @@ float CompFilter_Update(ComplementaryFilter *filter, float ax, float ay, float a
 
     return filter->current_angle;
 }
+```
