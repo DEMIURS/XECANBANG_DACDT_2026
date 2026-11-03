@@ -42,12 +42,14 @@ $$P(k) = K_p \cdot e(k)$$
 $$I(k) = I(k-1) + K_i \cdot e(k) \cdot \Delta t$$
 
 ### 2.3. Khâu Vi phân (Derivative)
-* **Phương pháp vi phân sai số:**
+* **Vi phân sai số:**
   $$D(k) = K_d \cdot \frac{e(k) - e(k-1)}{\Delta t}$$
-* **Phương pháp tối ưu cho xe cân bằng (Derivative on Measurement):**
-  Trong xe cân bằng, sai số góc $e(k) = \theta_{setpoint} - \theta(k)$. Khi thay đổi setpoint đột ngột, việc vi phân sai số sẽ sinh ra xung kích (Derivative Kick). Thay vào đó, ta sử dụng trực tiếp tốc độ góc con quay hồi chuyển $\omega_{gyro}$ thu thập từ BMI160:
+* **Vi phân trên giá trị đo (Derivative on Measurement):**
+  Vi phân sai số có thể tạo xung kích khi setpoint thay đổi đột ngột. Có thể lấy đạo hàm âm của giá trị đo:
+  $$D(k) = -K_d \cdot \frac{y(k) - y(k-1)}{\Delta t}$$
+  Hàm `PID_Compute` bên dưới dùng cách này. Với vòng cân bằng góc, có thể dùng trực tiếp tốc độ gyro đã hiệu chuẩn, cùng trục, dấu và đơn vị với góc:
   $$D(k) = -K_d \cdot \omega_{gyro}(k)$$
-  *Cách làm này loại bỏ hoàn toàn nhiễu sai phân số và cho phản hồi giảm chấn tức thời, mượt mà.*
+  *Cách làm này tránh lấy sai phân số của góc đo; dữ liệu gyro vẫn cần được hiệu chuẩn và lọc nhiễu phù hợp.*
 
 ### 2.4. Tín hiệu đầu ra tổng
 $$u(k) = P(k) + I(k) + D(k)$$
@@ -56,11 +58,11 @@ $$u(k) = P(k) + I(k) + D(k)$$
 
 ## 3. Các kỹ thuật tối ưu bắt buộc trong thực tế
 
-### 3.1. Chống bão hòa tích phân (Anti-windup)
-Khi cơ cấu chấp hành (động cơ / PWM) đạt giới hạn bão hòa (ví dụ: duty cycle = 100%), nếu sai số vẫn tồn tại, thành phần tích phân sẽ tiếp tục tăng lũy kế đến giá trị khổng lồ. Khi sai số đảo chiều, hệ thống sẽ mất nhiều thời gian để "xả" lượng tích phân này, gây vọt lố nghiêm trọng:
+### 3.1. Giới hạn tích phân và chống windup
+Kẹp tích phân giới hạn mức tích lũy nhưng tự nó chưa tính đến bão hòa đầu ra. Ví dụ dưới đây minh họa phép kẹp; hàm `PID_Compute` dùng thêm tích phân có điều kiện để không tiếp tục tích lũy theo hướng đẩy đầu ra sâu hơn vào vùng bão hòa.
 
 ```c
-// Giới hạn giá trị khâu tích phân (Integral Clamping)
+// Giới hạn giá trị tích phân (Integrator Clamping)
 if (pid->integral > pid->integral_max) {
     pid->integral = pid->integral_max;
 } else if (pid->integral < -pid->integral_max) {
@@ -84,14 +86,14 @@ Xe hai bánh tự cân bằng là hệ thống phi tuyến, bất ổn định d
 
 ```mermaid
 flowchart TD
-    subgraph Vòng_Vận_Tốc ["Vòng Ngoài: Vận Tốc / Vị Trí (Chạy chu kỳ 20ms - 50Hz)"]
+    subgraph SpeedLoop["Vòng Ngoài: Vận Tốc / Vị Trí (Chu kỳ 20–50 ms)"]
         V_ref["Vận tốc đặt (V_target)"] --> Sum_V(("-"))
         V_fb["Vận tốc đo (Encoder)"] --> Sum_V
         Sum_V -->|Sai số vận tốc| PID_Speed["Bộ điều khiển Speed PID (PI)"]
         PID_Speed -->|Góc nghiêng mong muốn| Theta_ref["Góc đặt θ_target"]
     end
 
-    subgraph Vòng_Cân_Bằng ["Vòng Trong: Góc Nghiêng (Chạy chu kỳ 5ms - 200Hz)"]
+    subgraph BalanceLoop["Vòng Trong: Góc Nghiêng (Chu kỳ 5–10 ms)"]
         Theta_ref --> Sum_A(("-"))
         Theta_fb["Góc lọc bù θ_filtered"] --> Sum_A
         Sum_A -->|Sai số góc| PID_Angle["Bộ điều khiển Angle PID (PD)"]
@@ -139,8 +141,8 @@ typedef struct {
     float integral;       // Biến tích lũy tích phân
     float integral_max;   // Giới hạn chống tràn tích phân (Anti-windup)
     
-    float prev_error;     // Sai số ở bước trước
     float prev_measured;  // Giá trị đo ở bước trước
+    uint8_t derivative_initialized;
 
     float out_min;        // Giới hạn bão hòa dưới
     float out_max;        // Giới hạn bão hòa trên
@@ -163,64 +165,76 @@ float PID_Angle_Compute(PID_Controller_t *pid, float angle_setpoint,
 
 void PID_Init(PID_Controller_t *pid, float kp, float ki, float kd, 
               float integral_max, float out_min, float out_max) {
+    if (pid == 0) return;
     pid->Kp = kp;
     pid->Ki = ki;
     pid->Kd = kd;
     pid->integral = 0.0f;
     pid->integral_max = integral_max;
-    pid->prev_error = 0.0f;
     pid->prev_measured = 0.0f;
+    pid->derivative_initialized = 0U;
     pid->out_min = out_min;
     pid->out_max = out_max;
 }
 
 void PID_Reset(PID_Controller_t *pid) {
+    if (pid == 0) return;
     pid->integral = 0.0f;
-    pid->prev_error = 0.0f;
     pid->prev_measured = 0.0f;
+    pid->derivative_initialized = 0U;
 }
 
 // Hàm tính toán tổng quát (Dùng cho vòng ngoài: Speed PID)
 float PID_Compute(PID_Controller_t *pid, float setpoint, float measured, float dt) {
-    float error = setpoint - measured;
+    if (pid == 0 || dt <= 0.0f) return 0.0f;
 
-    // 1. Khâu tỉ lệ
+    float error = setpoint - measured;
     float p_term = pid->Kp * error;
 
-    // 2. Khâu tích phân kèm Anti-windup
-    pid->integral += error * dt;
-    if (pid->integral > pid->integral_max) pid->integral = pid->integral_max;
-    else if (pid->integral < -pid->integral_max) pid->integral = -pid->integral_max;
-    float i_term = pid->Ki * pid->integral;
-
-    // 3. Khâu vi phân
-    float derivative = (dt > 0.0f) ? ((error - pid->prev_error) / dt) : 0.0f;
+    // Khởi tạo mẫu đo trước để tránh xung vi phân ở lần gọi đầu tiên.
+    if (pid->derivative_initialized == 0U) {
+        pid->prev_measured = measured;
+        pid->derivative_initialized = 1U;
+    }
+    float derivative = -(measured - pid->prev_measured) / dt;
     float d_term = pid->Kd * derivative;
-    pid->prev_error = error;
+    pid->prev_measured = measured;
 
-    // 4. Tổng đầu ra và kẹp biên
-    float output = p_term + i_term + d_term;
+    // Tích phân có giới hạn và ngừng tăng nếu nó đẩy đầu ra sâu hơn vào bão hòa.
+    float integral_limit = pid->integral_max >= 0.0f
+                         ? pid->integral_max : -pid->integral_max;
+    float candidate_integral = pid->integral + error * dt;
+    if (candidate_integral > integral_limit) candidate_integral = integral_limit;
+    else if (candidate_integral < -integral_limit) candidate_integral = -integral_limit;
+
+    float candidate_output = p_term + d_term + pid->Ki * candidate_integral;
+    float integral_output_change = pid->Ki * (candidate_integral - pid->integral);
+    if (!((candidate_output > pid->out_max && integral_output_change > 0.0f) ||
+          (candidate_output < pid->out_min && integral_output_change < 0.0f))) {
+        pid->integral = candidate_integral;
+    }
+
+    float output = p_term + d_term + pid->Ki * pid->integral;
     if (output > pid->out_max) output = pid->out_max;
     else if (output < pid->out_min) output = pid->out_min;
 
     return output;
 }
 
-// Hàm tính toán chuyên biệt cho vòng trong (Angle Loop) dùng trực tiếp Gyro Rate
+// Hàm PD chuyên biệt cho vòng trong (Angle Loop), dùng tốc độ gyro đã hiệu chuẩn.
 float PID_Angle_Compute(PID_Controller_t *pid, float angle_setpoint, 
                         float angle_measured, float gyro_rate) {
+    if (pid == 0) return 0.0f;
+
     float error = angle_setpoint - angle_measured;
 
     // 1. Khâu tỉ lệ (Phản ứng theo góc nghiêng)
     float p_term = pid->Kp * error;
 
-    // 2. Khâu vi phân (Trực tiếp từ cảm biến Gyroscope, không bị nhiễu sai phân số)
+    // 2. Khâu vi phân từ gyro; tránh sai phân số góc nhưng vẫn cần lọc nhiễu gyro.
     float d_term = -pid->Kd * gyro_rate;
 
-    // 3. Khâu tích phân (nếu sử dụng)
-    float i_term = pid->Ki * pid->integral;
-
-    float output = p_term + i_term + d_term;
+    float output = p_term + d_term;
     if (output > pid->out_max) output = pid->out_max;
     else if (output < pid->out_min) output = pid->out_min;
 
@@ -243,11 +257,11 @@ graph TD
     Step6 -- Đã đạt --> Done["Hoàn tất cân chỉnh PID"]
 ```
 
-1. **Hiệu chỉnh điểm không cơ học (Mechanical Zero Offset):**
-   * Do trọng tâm thực tế của xe không bao giờ nằm chính xác $0^\circ$ góc cảm biến, hãy tìm góc $\theta_0$ mà xe có thể tự đứng cân bằng tự nhiên mà không cần cấp nguồn động cơ.
+1. **Hiệu chỉnh điểm cân bằng (Angle Setpoint Offset):**
+   * Sau khi kiểm tra chiều trục, dấu góc và chiều quay động cơ, xác định setpoint gần điểm xe có thể cân bằng khi được giữ và cấp công suất. Sai lệch cơ khí giữa cảm biến, khung xe và trọng tâm có thể khiến setpoint làm việc khác $0^\circ$; không suy ra giá trị này khi xe đang tắt động cơ.
 2. **Cân chỉnh vòng góc (Angle PID - Vòng trong):**
    * Đặt toàn bộ hệ số khác bằng 0.
-   * Tăng $K_{p\_angle}$ dần từ nhỏ đến khi xe có thể tự phản ứng dựng thẳng nhưng vẫn lắc qua lắc lại quanh điểm cân bằng.
+   * Tăng $K_{p\_angle}$ dần từ nhỏ đến khi xe phản ứng dựng thẳng nhưng còn dao động quanh điểm cân bằng.
    * Tăng $K_{d\_angle}$ dần để hấp thụ dao động. Khi chỉnh đúng, nếu dùng ngón tay đẩy nhẹ vào thân xe, bạn sẽ thấy lực cản phản kháng đàn hồi và xe trở lại vị trí thẳng đứng ngay lập tức mà không bị rung giật.
 3. **Cân chỉnh vòng tốc độ (Speed PID - Vòng ngoài):**
    * Sau khi vòng góc đã ổn định, kích hoạt vòng vận tốc.

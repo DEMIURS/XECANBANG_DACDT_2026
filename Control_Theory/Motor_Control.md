@@ -25,29 +25,32 @@ Mạch cầu H (H-Bridge) cho phép đảo chiều dòng điện chạy qua cu�
                 GND
 ```
 
-* **Quay thuận:** Đóng Q1 và Q4 $\rightarrow$ Dòng điện chạy từ trái sang phải qua động cơ.
-* **Quay nghịch:** Đóng Q3 and Q2 $\rightarrow$ Dòng điện đảo chiều chạy từ phải sang trái.
-* **Phanh hãm (Brake):** Đóng đồng thời Q2 và Q4 (nối tắt 2 cực động cơ xuống GND) $\rightarrow$ Sinh ra sực điện động ngược dập tắt quán tính nhanh chóng.
+* **Quay thuận:** Đóng Q1 và Q4 $\rightarrow$ Dòng điện chạy qua động cơ theo một chiều.
+* **Quay nghịch:** Đóng Q3 và Q2 $\rightarrow$ Dòng điện chạy qua động cơ theo chiều ngược lại.
+* **Phanh hãm (Brake):** Đóng đồng thời Q2 và Q4, nối hai cực động cơ xuống GND; sức điện động của động cơ tạo mô-men hãm.
 * **Thả trôi (Coast):** Mở tất cả các khóa transistor $\rightarrow$ Động cơ dừng quay tự do theo quán tính.
 
 ### 1.2. Bảng chân lý điều khiển Driver TB6612FNG
-Driver **TB6612FNG** sử dụng transistor công nghệ MOSFET công suất thấp, tản nhiệt tốt và hiệu suất vượt trội so với dòng IC BJT cũ như L298N.
+Driver **TB6612FNG** là cầu H MOSFET kép. Giới hạn dòng và nhiệt thực tế phụ thuộc điều kiện tản nhiệt, bo mạch và tải; không suy ra dòng liên tục của module chỉ từ dòng đỉnh ghi trong datasheet.
 
 | Chân STBY | Chân IN1 | Chân IN2 | Chân PWM | Trạng thái kênh A/B | Chế độ hoạt động |
 | :---: | :---: | :---: | :---: | :---: | :--- |
-| `0` (LOW) | $\times$ | $\times$ | $\times$ | Ngắt hoàn toàn | **Chế độ chờ (Standby Mode) - Tiết kiệm điện** |
-| `1` (HIGH)| `1` | `0` | `Duty` | $V_{out} = +V_{bat} \times \text{Duty}$ | **Quay thuận (Forward Drive)** |
-| `1` (HIGH)| `0` | `1` | `Duty` | $V_{out} = -V_{bat} \times \text{Duty}$ | **Quay nghịch (Reverse Drive)** |
-| `1` (HIGH)| `0` | `0` | $\times$ | Cực hở (High-Z) | **Thả trôi theo quán tính (Coast)** |
-| `1` (HIGH)| `1` | `1` | $\times$ | Nối đất (GND) | **Phanh động cơ chủ động (Short Brake)** |
+| `1` (HIGH) | `1` | `0` | `HIGH` | OUT1 = HIGH, OUT2 = LOW | **Quay thuận (CW)** |
+| `1` (HIGH) | `0` | `1` | `HIGH` | OUT1 = LOW, OUT2 = HIGH | **Quay nghịch (CCW)** |
+| `1` (HIGH) | `×` | `×` | `LOW` | Hai đầu ra ở mức LOW | **Phanh ngắn mạch (Short Brake)** |
+| `1` (HIGH) | `1` | `1` | `HIGH` | Hai đầu ra ở mức LOW | **Phanh ngắn mạch (Short Brake)** |
+| `1` (HIGH) | `0` | `0` | `HIGH` | Hai đầu ra trở kháng cao | **Dừng thả trôi (Stop / Coast)** |
+| `0` (LOW) | `×` | `×` | `×` | Hai đầu ra trở kháng cao | **Chế độ chờ (Standby)** |
+
+PWM mức LOW làm ngắn mạch hai đầu ra để phanh; vì vậy `IN1 = IN2 = 0` chỉ tạo trạng thái thả trôi khi PWM ở mức HIGH. Bảng trên là trạng thái logic; khi PWM được điều chế, động cơ luân phiên giữa trạng thái dẫn và trạng thái tương ứng với mức LOW của PWM.
 
 ### 1.3. Lựa chọn tần số phát xung PWM trên STM32
 Tần số điều chế xung PWM cấp cho chân `PWMA` và `PWMB` được chọn tối ưu trong khoảng **$10\text{ kHz} \div 20\text{ kHz}$**:
-* **Không chọn tần số thấp ($< 8\text{ kHz}$):** Cuộn cảm động cơ sẽ dao động tạo tiếng rít tần số âm thanh chói tai và làm dòng điện gợn sóng lớn.
-* **Không chọn tần số quá cao ($> 50\text{ kHz}$):** Tổn hao đóng cắt (switching loss) trên MOSFET của TB6612FNG tăng cao gây phát nhiệt.
+* Dải **10–20 kHz** là điểm bắt đầu để giảm tiếng rít nghe được; cần kiểm tra nhiệt độ driver và dòng động cơ khi chạy thực tế.
+* Đây là lựa chọn thiết kế, không phải giới hạn cứng của TB6612FNG. Datasheet nêu tần số PWM tối đa 100 kHz; không vận hành vượt giới hạn này.
 * **Cấu hình Timer STM32 (Timer Clock = 72 MHz):**
   * `Prescaler (PSC)`: $0$ (Clock đếm 72 MHz)
-  * `Auto-Reload Register (ARR)`: $3599 \rightarrow f_{PWM} = \frac{72\text{ MHz}}{3600} = 20\text{ kHz}$.
+  * `Auto-Reload Register (ARR)`: $3599 \rightarrow f_{PWM} = \frac{72\text{ MHz}}{3600} = 20\text{ kHz}$, nếu clock thực tế của timer là 72 MHz.
   * Dải điều chỉnh độ rộng xung: $0 \div 3599$.
 
 ---
@@ -74,6 +77,8 @@ Bằng cách kích hoạt chế độ **Encoder Mode (TIM_ENCODERMODE_TI12)** tr
 * Tỉ số truyền hộp giảm tốc (Gear Ratio) $i$ (ví dụ: $i \approx 21.3$ đối với bản 280 RPM):
   $$\text{Total Ticks Per Rev (Trục bánh xe)} = \text{PPR} \times 4 \times i \approx 44 \times 21.3 \approx 937.2\text{ xung/vòng}$$
 
+Các con số trên giả định 11 xung được tính cho mỗi kênh trên một vòng trục motor. Xác nhận định nghĩa PPR của đúng encoder và đo tick thực tế trên một vòng bánh xe trước khi dùng làm hằng số điều khiển.
+
 #### Công thức tính vận tốc góc của bánh xe (vòng/phút - RPM):
 $$\omega_{RPM} = \frac{\Delta \text{Ticks}}{\text{Ticks\_Per\_Rev} \times \Delta t} \times 60$$
 
@@ -92,13 +97,19 @@ Nếu không bù vùng chết:
 
 ### Thuật toán bù vùng chết:
 ```c
+#include <stdint.h>
+
 int16_t Motor_CompensateDeadzone(int16_t pwm_raw, int16_t deadzone, int16_t max_pwm) {
-    int16_t pwm_out = 0;
+    int32_t pwm_out = 0;
+
+    if (deadzone < 0 || max_pwm <= 0 || deadzone > max_pwm) {
+        return 0;
+    }
 
     if (pwm_raw > 0) {
-        pwm_out = pwm_raw + deadzone;
+        pwm_out = (int32_t)pwm_raw + deadzone;
     } else if (pwm_raw < 0) {
-        pwm_out = pwm_raw - deadzone;
+        pwm_out = (int32_t)pwm_raw - deadzone;
     } else {
         pwm_out = 0;
     }
@@ -107,7 +118,7 @@ int16_t Motor_CompensateDeadzone(int16_t pwm_raw, int16_t deadzone, int16_t max_
     if (pwm_out > max_pwm) pwm_out = max_pwm;
     else if (pwm_out < -max_pwm) pwm_out = -max_pwm;
 
-    return pwm_out;
+    return (int16_t)pwm_out;
 }
 ```
 
@@ -189,14 +200,20 @@ void Motor_Init(void) {
 }
 
 static int16_t Apply_Deadzone(int16_t val) {
-    if (val > 0) val += MOTOR_DEADZONE;
-    else if (val < 0) val -= MOTOR_DEADZONE;
-    if (val > PWM_MAX_VALUE) val = PWM_MAX_VALUE;
-    if (val < -PWM_MAX_VALUE) val = -PWM_MAX_VALUE;
-    return val;
+    int32_t corrected = val;
+
+    if (corrected > 0) corrected += MOTOR_DEADZONE;
+    else if (corrected < 0) corrected -= MOTOR_DEADZONE;
+
+    if (corrected > PWM_MAX_VALUE) corrected = PWM_MAX_VALUE;
+    if (corrected < -PWM_MAX_VALUE) corrected = -PWM_MAX_VALUE;
+    return (int16_t)corrected;
 }
 
 void Motor_SetOutput(int16_t pwm_left, int16_t pwm_right) {
+    // Cho phép driver hoạt động lại sau Motor_Stop().
+    HAL_GPIO_WritePin(STBY_PORT, STBY_PIN, GPIO_PIN_SET);
+
     pwm_left = Apply_Deadzone(pwm_left);
     pwm_right = Apply_Deadzone(pwm_right);
 
@@ -212,6 +229,7 @@ void Motor_SetOutput(int16_t pwm_left, int16_t pwm_right) {
     } else {
         HAL_GPIO_WritePin(AIN1_PORT, AIN1_PIN, GPIO_PIN_RESET);
         HAL_GPIO_WritePin(AIN2_PORT, AIN2_PIN, GPIO_PIN_RESET);
+        // PWM = 0 tạo chế độ phanh ngắn mạch theo bảng trạng thái TB6612FNG.
         __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, 0);
     }
 
@@ -227,8 +245,16 @@ void Motor_SetOutput(int16_t pwm_left, int16_t pwm_right) {
     } else {
         HAL_GPIO_WritePin(BIN1_PORT, BIN1_PIN, GPIO_PIN_RESET);
         HAL_GPIO_WritePin(BIN2_PORT, BIN2_PIN, GPIO_PIN_RESET);
+        // PWM = 0 tạo chế độ phanh ngắn mạch theo bảng trạng thái TB6612FNG.
         __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_2, 0);
     }
+}
+
+void Motor_Stop(void) {
+    // STBY = LOW đặt cả hai kênh vào trạng thái high-impedance (thả trôi).
+    __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, 0);
+    __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_2, 0);
+    HAL_GPIO_WritePin(STBY_PORT, STBY_PIN, GPIO_PIN_RESET);
 }
 
 int16_t Encoder_GetLeftTicks(void) {
@@ -243,3 +269,9 @@ int16_t Encoder_GetRightTicks(void) {
     return ticks;
 }
 ```
+
+## 6. Tài liệu tham khảo
+
+* [Toshiba TB6612FNG Datasheet](https://toshiba.semicon-storage.com/info/TB6612FNG_datasheet_en_20141001.pdf) — bảng trạng thái logic, dải nguồn và giới hạn PWM.
+* [STMicroelectronics STM32F103x8/xB Datasheet và Reference Manual](../References/Links.md) — cấu hình timer PWM và encoder.
+* [JGA25-370 và thông tin encoder](../Components_Research/DC_geared_motor_JGA25-370_12V_280rpm/README.md).

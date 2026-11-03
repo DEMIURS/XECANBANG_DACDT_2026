@@ -1,58 +1,70 @@
-# 📡 Bộ Lọc Bù (Complementary Filter)
+# 📡 Bộ lọc bù (Complementary Filter)
 
-Ước lượng góc nghiêng chính xác bằng cách kết hợp ưu điểm của **Con quay hồi chuyển (Gyroscope)** và **Cảm biến gia tốc (Accelerometer)**.
-
----
-
-## 1. Vấn đề của cảm biến quán tính (IMU)
-
-* **Accelerometer (Cảm biến gia tốc):**
-  - **Ưu điểm:** Đo góc tĩnh tốt dựa trên trọng trường Trái Đất, không bị trôi dạt theo thời gian dài.
-  - **Nhược điểm:** Nhạy cảm với rung động cơ khí và gia tốc tịnh tiến ngắn hạn (nhiễu tần số cao).
-* **Gyroscope (Con quay hồi chuyển):**
-  - **Ưu điểm:** Đo tốc độ góc cực nhanh, mượt, không bị ảnh hưởng bởi rung chấn ngoại lực.
-  - **Nhược điểm:** Tích lũy sai số trôi góc (Drift) theo thời gian khi tích phân vận tốc góc (nhiễu tần số thấp).
+Bộ lọc bù kết hợp góc ước lượng từ gia tốc kế với tốc độ góc từ con quay hồi chuyển. Gia tốc kế giữ góc lâu dài ổn định nhưng nhiễu khi xe rung hoặc tăng tốc; con quay hồi chuyển phản ứng nhanh nhưng sai lệch bias sẽ làm góc tích phân bị trôi.
 
 ---
 
-## 2. Nguyên lý bộ lọc bù
+## 1. Phương trình rời rạc
 
-Bộ lọc bù đưa tín hiệu Accel qua **Bộ lọc thông thấp (Low-Pass Filter)** và tín hiệu tích phân Gyro qua **Bộ lọc thông cao (High-Pass Filter)**, sau đó cộng gộp lại:
+Ở mỗi chu kỳ lấy mẫu, bộ lọc tích phân tốc độ góc rồi hiệu chỉnh kết quả bằng góc gia tốc kế:
 
-$$\theta_{\text{filtered}}(k) = \alpha \cdot \left[ \theta_{\text{filtered}}(k-1) + \omega_{\text{gyro}} \cdot dt \right] + (1 - \alpha) \cdot \theta_{\text{acc}}$$
+$$\theta_k = \alpha\left(\theta_{k-1} + \omega_k\Delta t\right) + (1-\alpha)\theta_{acc,k}$$
 
 Trong đó:
-* $\theta_{\text{acc}}$: Góc tính từ gia tốc kế, $\theta_{\text{acc}} = \text{atan2}(A_y, A_z) \cdot \frac{180}{\pi}$.
-* $\omega_{\text{gyro}}$: Tốc độ góc đọc từ Gyro (đơn vị: `deg/s`).
-* $dt$: Khoảng thời gian giữa 2 lần lấy mẫu (`seconds`).
-* $\alpha$: Hệ số trọng số ($0 < \alpha < 1$). Thường chọn $\alpha \approx 0.95 \div 0.98$.
 
----
+* $\theta_k$: góc sau lọc tại mẫu hiện tại, tính bằng độ.
+* $\theta_{acc,k}$: góc tính từ gia tốc kế, tính bằng độ.
+* $\omega_k$: tốc độ góc đã trừ bias, tính bằng độ/giây và cùng chiều trục với góc đang ước lượng.
+* $\Delta t$: thời gian giữa hai mẫu, tính bằng giây.
+* $\alpha$: trọng số của gyro, với $0 < \alpha < 1$. Giá trị thường dùng ở chu kỳ lấy mẫu ổn định là khoảng 0,95–0,99; cần hiệu chỉnh theo tần số lấy mẫu và mức rung thực tế.
 
-## 3. Mã nguồn C/C++ triển khai
+Gia tốc kế và gyro phải dùng cùng quy ước trục, dấu và đơn vị. Công thức một trục dưới đây phù hợp với góc nghiêng quanh một trục, đặc biệt khi xe hoạt động gần tư thế thẳng đứng. Chọn góc và tốc độ góc tương ứng theo cách lắp BMI160; không ghép góc roll với tốc độ gyro của trục pitch.
+
+## 2. Tính góc từ gia tốc kế
+
+Với quy ước trục đã kiểm tra theo cách lắp cảm biến:
+
+* Roll: $\phi = \operatorname{atan2}(A_y,A_z)\cdot 180/\pi$.
+* Pitch: $\theta = \operatorname{atan2}(-A_x,\sqrt{A_y^2+A_z^2})\cdot 180/\pi$.
+
+Đổi trục hoặc dấu nếu hướng đặt cảm biến trên xe khác với quy ước trên. Khi xe đang tăng tốc, gia tốc kế cũng đo gia tốc chuyển động nên góc tức thời có thể sai; đây là lý do bộ lọc giảm trọng số tín hiệu này ở dải tần cao.
+
+## 3. Mã C minh họa cho một trục
+
+Hàm nhận góc gia tốc kế và tốc độ gyro đã hiệu chuẩn. Phía gọi chịu trách nhiệm tính `accel_angle_deg` theo trục lắp đặt và đổi gyro sang `deg/s`.
 
 ```c
-#include <math.h>
-
-#define RAD_TO_DEG 57.295779513082320876f
-
 typedef struct {
-    float alpha;         // Hệ số lọc bù (0.95 - 0.98)
-    float current_angle; // Góc sau khi lọc (deg)
+    float alpha;        // 0 < alpha < 1
+    float angle_deg;    // Góc ước lượng hiện tại
 } ComplementaryFilter;
 
-void CompFilter_Init(ComplementaryFilter *filter, float alpha, float initial_angle) {
+void CompFilter_Init(ComplementaryFilter *filter, float alpha,
+                     float initial_angle_deg) {
+    if (filter == 0) return;
     filter->alpha = alpha;
-    filter->current_angle = initial_angle;
+    filter->angle_deg = initial_angle_deg;
 }
 
-float CompFilter_Update(ComplementaryFilter *filter, float ax, float ay, float az, float gx, float dt) {
-    // 1. Tính góc pitch từ gia tốc kế
-    float accel_angle = atan2f(ay, az) * RAD_TO_DEG;
+float CompFilter_Update(ComplementaryFilter *filter,
+                        float accel_angle_deg,
+                        float gyro_rate_dps,
+                        float dt_s) {
+    if (filter == 0 || dt_s <= 0.0f ||
+        filter->alpha <= 0.0f || filter->alpha >= 1.0f) {
+        return filter != 0 ? filter->angle_deg : 0.0f;
+    }
 
-    // 2. Tích hợp tốc độ góc Gyro và bù trừ với Accel
-    filter->current_angle = filter->alpha * (filter->current_angle + gx * dt) 
-                          + (1.0f - filter->alpha) * accel_angle;
-
-    return filter->current_angle;
+    filter->angle_deg = filter->alpha *
+                        (filter->angle_deg + gyro_rate_dps * dt_s) +
+                        (1.0f - filter->alpha) * accel_angle_deg;
+    return filter->angle_deg;
 }
+```
+
+Trước khi gọi hàm, kiểm tra con trỏ và dữ liệu cảm biến hợp lệ; giá trị `dt_s` phải là thời gian thực giữa các mẫu, không phải mili giây. Nếu chu kỳ lấy mẫu thay đổi đáng kể, hãy tính lại `alpha` theo chu kỳ mới hoặc dùng hệ số phụ thuộc thời gian.
+
+## 4. Tài liệu liên quan
+
+* [Lý thuyết cảm biến IMU](IMU_Theory.md)
+* [Tài liệu tham khảo và datasheet](../../References/Links.md)
