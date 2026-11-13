@@ -54,6 +54,8 @@ $$\theta(k) = \theta(k-1) + \omega(k) \cdot \Delta t$$
 
 Trước khi đưa vào thuật toán điều khiển, bắt buộc phải loại bỏ Gyro Offset bằng quy trình lấy mẫu tĩnh khi vừa cấp nguồn:
 
+> Ví dụ `500` mẫu bên dưới là ví dụ tổng quát, không phải cấu hình đã chốt cho xe này. Đặc tả BMI160 của dự án nêu thời gian hiệu chuẩn 2 giây nhưng một bảng khác lại nêu 500 mẫu. Ở 100 Hz, 2 giây tương đương khoảng 200 mẫu; cần thống nhất thông số trước khi triển khai hiệu chuẩn firmware.
+
 ```c
 #define CALIBRATION_SAMPLES 500
 

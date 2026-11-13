@@ -22,10 +22,10 @@ Bộ lọc bù đưa tín hiệu Accel qua **Bộ lọc thông thấp (Low-Pass 
 $$\theta_{\text{filtered}}(k) = \alpha \cdot \left[ \theta_{\text{filtered}}(k-1) + \omega_{\text{gyro}} \cdot dt \right] + (1 - \alpha) \cdot \theta_{\text{acc}}$$
 
 Trong đó:
-* $\theta_{\text{acc}}$: Góc tính từ gia tốc kế, $\theta_{\text{acc}} = \text{atan2}(A_y, A_z) \cdot \frac{180}{\pi}$.
-* $\omega_{\text{gyro}}$: Tốc độ góc đọc từ Gyro (đơn vị: `deg/s`).
-* $dt$: Khoảng thời gian giữa 2 lần lấy mẫu (`seconds`).
-* $\alpha$: Hệ số trọng số ($0 < \alpha < 1$). Thường chọn $\alpha \approx 0.95 \div 0.98$.
+* Với cách lắp IMU theo sơ đồ dự án (tiến là $-Y$, lên là $+Z$), góc nghiêng tiến dương quanh $+X$ được tính là $\theta_{acc}=\text{atan2}(-A_y,A_z)\cdot 180/\pi$.
+* $\omega_{gyro}$: tốc độ góc trục X sau khi trừ bias, đơn vị `deg/s`; chiều dương theo quy ước góc trên.
+* $dt$: chu kỳ lấy mẫu. Đặc tả BMI160 của dự án yêu cầu 100 Hz, tương ứng `0.01 s`.
+* $\alpha$: hệ số trọng số. Đặc tả dự án chọn `0.98`.
 
 ---
 
@@ -47,11 +47,11 @@ void CompFilter_Init(ComplementaryFilter *filter, float alpha, float initial_ang
 }
 
 float CompFilter_Update(ComplementaryFilter *filter, float ax, float ay, float az, float gx, float dt) {
-    // 1. Tính góc pitch từ gia tốc kế
-    float accel_angle = atan2f(ay, az) * RAD_TO_DEG;
+    // Theo sơ đồ lắp: tiến là -Y, lên là +Z, nghiêng tiến dương quanh +X.
+    float accel_angle = atan2f(-ay, az) * RAD_TO_DEG;
 
     // 2. Tích hợp tốc độ góc Gyro và bù trừ với Accel
-    filter->current_angle = filter->alpha * (filter->current_angle + gx * dt) 
+    filter->current_angle = filter->alpha * (filter->current_angle + gx * dt)
                           + (1.0f - filter->alpha) * accel_angle;
 
     return filter->current_angle;
